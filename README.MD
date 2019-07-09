@@ -12,7 +12,7 @@
 ### 依赖说明
 > 需要NodeJs的支持，最好推荐安装 git 工具，windows下，git自带bash工具，方便我们使用linux命令实现基本的操作
 
-- NodeeJs
+- NodeJs
 - Git
 - npm
 - cnpm
