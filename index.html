@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Notes</title>
+    <link rel="stylesheet" href="three/css/element-ui-2.8.2.css">
+    <!-- icon -->
+    <link rel="stylesheet" type="text/css" href="three/iconfont/iconfont.css">
+    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon" />
+    <!-- ueditor -->
+    <link href="three/utf8-jsp/themes/default/css/ueditor.css" type="text/css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            width: 0.6vw;
+            height: 0.6vw;
+        }
+
+        ::-webkit-scrollbar-track {
+            background-color: white;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: #00aff0;
+        }
+
+        body {
+            height: 100%;
+            overflow: auto;
+            min-width: 800px;
+        }
+
+        .look-body {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: auto;
+        }
+
+        .look-body>.look-contents {
+            flex: 1;
+            display: flex;
+            padding: 0 10px;
+            position: relative;
+        }
+
+        .look-body>.look-contents>.float-button-group {
+            position: absolute;
+            z-index: 1002;
+            top: 5%;
+            left: 170px;
+            color: gray;
+            background-color: rgba(255, 49, 163, 0.3);
+        }
+
+        .look-body>.look-contents>.content-left {
+            box-sizing: border-box;
+            border-right: 1px solid #ddd;
+            overflow-y: scroll;
+            overflow-x: hidden;
+            height: 100%;
+            flex-basis: 22%;
+        }
+
+        .look-body>.look-contents>.content-right {
+            flex: 1;
+        }
+
+        .content-left .is-active>.el-collapse-item__wrap {
+            /*background-color: #E4E7ED;*/
+        }
+
+        .content-right .menu-item {
+            border: 1px solid white;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .content-left .menu-item:hover {
+            font-weight: bold;
+        }
+
+        .content-left .menu-item span:hover {
+            background: #ddd;
+            color: #2D64B3 !important;
+        }
+
+        .issue-actived {
+            color: white;
+            font-weight: bold;
+        }
+
+        .content-left .issue-actived {
+            background: #00aff0 !important;
+        }
+
+        .limit-text-length {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
+        }
+
+        .content-right .nav-box {
+            padding: 0 5px;
+        }
+
+        .mod-layer {
+            position: absolute;
+            z-index: 9999;
+            width: 100%;
+            height: 100%;
+            background: white;
+            text-align: center;
+        }
+
+        .log_user_label {
+            display: inline-block;
+            min-width: 6rem;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app" class="look-body" style="position: relative">
+        <!-- 遮盖层，用于初始页面编辑器和vue没有加载完成之前，显示加载中界面 -->
+        <div class="mod-layer" v-if="!hideShade">
+            <img src="loding2.gif" />
+        </div>
+        <!--header-->
+        <div style="width: 100%;height: 0;"></div>
+
+        <!--contents-->
+        <div class="look-contents">
+            <!--left-->
+            <div class="content-left" v-show="hideLeft">
+                <el-collapse v-model="cid" @change="handelMenuChange" accordion v-if="uFlag">
+                    <el-collapse-item class="menu-collapse-item" v-for="item in dataMenus" :name="item.id">
+                        <template slot="title">
+                            <i class="header-icon el-icon-s-management" style="color: #409eff"></i>
+                            <b class="limit-text-length" :title="item.name">{{item.name}}</b>
+                        </template>
+                        <p v-for="issue in dataMenusIssues" :title="issue.title" style="cursor: pointer;"
+                            @click="handleMenuIssueClick($event, issue.id)" :class="[
+                            'menu-item']">
+                            <span class="limit-text-length"
+                                style="display:inline-block;width: 90%;background: #ddd;border-radius: 5px;color:white;padding: 0 10px;"
+                                :title="item.title">{{ issue.title }}</span>
+                        </p>
+                    </el-collapse-item>
+                </el-collapse>
+                <!--  -->
+                <p v-if="!uFlag" style="padding: 20px;"><b>暂无数据</b></p>
+            </div>
+            <!--right-->
+            <div class="content-right">
+                <div class="nav-box">
+                    <div
+                        style="width: 100%;background: gray;color: white;height: 40px;padding: 0 5px;line-height: 40px;">
+                        <span v-if="!uFlag">请登录！</span><b class="log_user_label" v-if="uFlag">{{ userLabel }}</b>
+                        <el-button size="mini" v-if="!uFlag" @click="handleLoginClick">登录</el-button>
+                        <el-button size="mini" v-if="uFlag" @click="handleLogoutClick">注销</el-button>
+                        <el-button size="mini" v-if="uFlag" @click="hideLeft = !hideLeft">{{ hideLeft?'隐藏':'显示' }}
+                        </el-button>
+                    </div>
+                    <el-form label-width="80px" label-suffix=":">
+                        <el-row>
+                            <el-col :span="6">
+                                <el-form-item label="分类">
+                                    <el-select v-model="formEditor.classify" placeholder="请选择" size="small"
+                                        :disabled="!uFlag">
+                                        <el-option v-for="item in dataMenus" :key="item.id" :label="item.name"
+                                            :value="parseInt(item.id)">
+                                        </el-option>
+                                    </el-select>
+                                </el-form-item>
+                            </el-col>
+                            <el-col :span="6">
+                                <el-form-item label="标题">
+                                    <el-input v-model="formEditor.title" size="small" :disabled="!uFlag"></el-input>
+                                </el-form-item>
+                            </el-col>
+                            <el-col :span="12">
+                                <el-form-item label="操作">
+                                    <el-button size="small" @click="handleNewClick" :disabled="!uFlag">新建</el-button>
+                                    <el-button size="small" @click="handleSaveClick" :disabled="!uFlag">保存</el-button>
+                                    <el-button size="small" @click="handleResetClick" :disabled="!uFlag">重置</el-button>
+                                    <el-button size="small" @click="handleDeleteIssue" :disabled="!uFlag">删除</el-button>
+                                    <el-button size="small" @click="handleClassifyClick" :disabled="!uFlag">分类
+                                    </el-button>
+                                </el-form-item>
+                            </el-col>
+                        </el-row>
+
+                        <el-row v-if="showClassifyManage">
+                            <el-col :span="6">
+                                <el-form-item label="分类">
+                                    <el-select v-model="formClassify.id" @change="handleClassifyChange"
+                                        placeholder="请选择" size="small" :disabled="!uFlag">
+                                        <el-option v-for="item in dataMenus" :key="item.id" :label="item.name"
+                                            :value="parseInt(item.id)">
+                                        </el-option>
+                                    </el-select>
+                                </el-form-item>
+                            </el-col>
+                            <el-col :span="6">
+                                <el-form-item label="分类名称">
+                                    <el-input v-model="formClassify.name" size="small" :disabled="!uFlag"></el-input>
+                                </el-form-item>
+                            </el-col>
+                            <el-col :span="12">
+                                <el-form-item label="操作">
+                                    <el-button size="small" @click="handleClassifySaveClick" :disabled="!uFlag">保存
+                                    </el-button>
+                                    <el-button size="small" @click="handleDeleteClassify" :disabled="!uFlag">删除
+                                    </el-button>
+                                    <el-button size="small" @click="handleResetClassify" :disabled="!uFlag">重置
+                                    </el-button>
+                                </el-form-item>
+                            </el-col>
+                        </el-row>
+                    </el-form>
+                </div>
+                <!--editor-->
+                <div class="edi">
+                    <script type="text/plain" id="myEditor"></script>
+                </div>
+            </div>
+        </div>
+
+        <!-- 用户登录的弹窗 -->
+        <el-dialog title="提示" :close-on-click-modal="false" :show-close="false" :visible.sync="dialogVisible"
+            width="40%" :before-close="handleClose">
+            <label>用户名</label>
+            <el-input v-model="loginData.username"></el-input>
+            <label>密码</label>
+            <el-input v-model="loginData.password" show-password></el-input>
+            <p style="color: #ddd">注意：每个账号都是独立存在的，可以使用多个账号存储不同的信息。</p>
+
+            <!-- 此处是修改密码 -->
+            <template v-if="checkPwdVisible">
+                <label>新密码</label>
+                <el-input v-model="loginData.npassword" show-password></el-input>
+                <label>确认密码</label>
+                <el-input v-model="loginData.rnpassword" show-password></el-input>
+            </template>
+
+            <span slot="footer" class="dialog-footer">
+                <el-button @click="dialogVisible = false">取 消</el-button>
+                <el-button type="primary" @click="handleLogin">确 定</el-button>
+                <el-button type="info" @click="handleRegisterClick">注 册</el-button>
+                <el-button @click="handleChangePwdClick">更改密码</el-button>
+                <el-button v-if="checkPwdVisible" @click="handleReChangePwdClick">再次确认</el-button>
+            </span>
+        </el-dialog>
+    </div>
+</body>
+<script src="three/vue-2.6.10.js"></script>
+<script src="three/element-ui-2.7.2.js"></script>
+<script src="three/jquery-3.2.1.min.js"></script>
+<script src="three/md5.js" type="text/javascript" charset="utf-8"></script>
+<!-- js ueditor -->
+<script type="text/javascript" charset="utf-8" src="three/utf8-jsp/ueditor.config.js"></script>
+<script type="text/javascript" charset="utf-8" src="three/utf8-jsp/ueditor.all.js"></script>
+<script type="text/javascript" charset="utf-8" src="three/utf8-jsp/lang/zh-cn/zh-cn.js"></script>
+
+<script src="ajax.js"></script>
+<script>
+    $.ajaxSetup({
+        cache: false,
+        dataType: 'json',
+        contentType: "application/json; charset=utf-8"
+    });
+    const PORT = 3100;
+    new Vue({
+        el: '#app',
+        data: function () {
+            return {
+                hideShade: false,
+                // 是否隐藏左边的
+                hideLeft: true,
+                // 是否登录的标识
+                uFlag: false,
+                // 这个是分类管理部分显示和隐藏控制
+                showClassifyManage: false,
+                //上次选中的菜单项
+                cid: undefined,
+                // 用于控制左侧菜单折叠和展开的，目前未使用
+                isHide: true,
+                /** umeditor */
+                umeditor: undefined,
+                /** 控制登录弹窗显示隐藏 */
+                dialogVisible: false,
+                /** 当前在用的菜单项的数据 */
+                curr_menu_classify: {},
+                /** 加载的菜单列表 */
+                dataMenus: [],
+                /** 当前加载的分类下的issue列表数据 */
+                dataMenusIssues: [],
+                /** 用户登录参数 */
+                loginData: {
+                    username: undefined,
+                    password: undefined,
+                    npassword: undefined,
+                    rnpassword: undefined
+                },
+                /** 表单提交的数据 */
+                formEditor: {
+                    id: undefined,
+                    title: undefined,
+                    content: undefined,
+                    classify: undefined
+                },
+                /** 分类提交的数据 */
+                formClassify: {
+                    id: undefined,
+                    name: undefined
+                },
+                // 用户的用户名
+                userLabel: undefined,
+                // 修改密码标记
+                checkPwdVisible: false
+            }
+        },
+        methods: {
+            getReqMessage(data) {
+                if (!data.msg) {
+                    return data.state === 'success' ? '执行成功'
+                        : data.state === 'warning' ? '执行发生异常情况'
+                            : data.state === 'error' ? '执行失败'
+                                : '未知结果';
+                }
+
+                return Array.isArray(data.msg) ? data.msg.toString() : data.msg
+            },
+            // 加载菜单及issue的统计数据
+            loadMenuDatas() {
+                jsonGetLocalData("/issue/count.do", {}, data => {
+                    data = getResultData(data);
+                    console.log('count classify data', data);
+                    this.dataMenus = data;
+                }, { port: PORT })
+            },
+            /** 将参数换行展示到textarea */
+            formatArrayByCR(param, arr) {
+                for (let v of arr) {
+                    param += v + "\n";
+                }
+            },
+            /** 对话框右上角关闭事件 */
+            handleClose(done) {
+                this.loginData.password = undefined;
+                this.loginData.npassword = undefined;
+                this.loginData.rnpassword = undefined;
+                if(done) done(); // 弹窗的 ·X· 管理触发
+            },
+            /** 登录按钮的单击 */
+            handleLoginClick() {
+                this.dialogVisible = true;
+            },
+            handleChangePwdClick() {
+                this.checkPwdVisible = !this.checkPwdVisible;
+            },
+            handleReChangePwdClick() {
+                let S = this;
+                // 检查密码
+                if (!S.loginData.username || S.loginData.username.length < 1) {
+                    S.$notify({ title: '提示', type: 'error', message: '用户名不能为空' });
+                    return;
+                }
+                if (!S.loginData.password || S.loginData.password.length < 1) {
+                    S.$notify({ title: '提示', type: 'error', message: '密码不能为空' });
+                    return;
+                }
+                if (!S.loginData.npassword || S.loginData.npassword.length < 1) {
+                    S.$notify({ title: '提示', type: 'error', message: '新密码不能为空' });
+                    return;
+                }
+                if (!S.loginData.rnpassword || S.loginData.rnpassword.length < 1) {
+                    S.$notify({ title: '提示', type: 'error', message: '确认密码不能为空' });
+                    return;
+                }
+
+                // 检查两次输入的密码不能为空
+                if (S.loginData.npassword != S.loginData.rnpassword) {
+                    this.$notify({ title: '提示', message: "两次密码输入不一致", type: 'error' });
+                    this.loginData.rnpassword = undefined
+                    return;
+                }
+
+                // 密码修改
+                let params = {};
+                params.password = hex_md5(S.loginData.password);
+                params.npassword = hex_md5(S.loginData.npassword);
+                params.rnpassword = hex_md5(S.loginData.rnpassword);
+                jsonPostLocalData("/user/repassword.do", params, data => {
+                    if (data.state === 'success') {
+                        S.$notify({ title: '提示', type: data.state, message: S.getReqMessage(data) });
+                        // 登出用户，需要重新登录
+                        this.handleLogoutClick();
+                        this.dialogVisible = false;
+                        this.handleClose();
+                    } else {
+                        S.$notify({ title: '提示', type: data.state, message: S.getReqMessage(data) });
+                    }
+                }, { port: PORT });
+            },
+            handleRegisterClick() {
+                let S = this;
+                if (S.loginData.password) {
+                    S.loginData.password = hex_md5(S.loginData.password);
+                } else {
+                    S.$notify({ title: '提示', type: 'error', message: '密码不能为空' });
+                }
+                jsonPostLocalData("/user/register.do", S.loginData, data => {
+                    if (data.state === 'success') {
+                        S.$notify({ title: '提示', type: data.state, message: S.getReqMessage(data) });
+                        this.loginData.password = undefined
+                    } else {
+                        S.$notify({ title: '提示', type: data.state, message: S.getReqMessage(data) });
+                        S.loginData.password = undefined
+                    }
+                }, { port: PORT });
+                this.dialogVisible = false;
+            },
+            /** 登出 */
+            handleLogoutClick() {
+                jsonPostLocalData("/user/logout.do", {}, data => {
+                    this.umeditor.setDisabled('fullscreen');
+                    this.handleResetClick();
+                    this.userLabel = undefined;
+                    this.uFlag = false;
+                    this.handleClose();
+                    this.dialogVisible = true;
+                }, { port: PORT });
+            },
+            /** 对话框登录事件 */
+            handleLogin() {
+                let S = this;
+                S.loginData.password = hex_md5(S.loginData.password);
+                jsonPostLocalData("/user/login.do", S.loginData, data => {
+                    let user = getOneResultData(data);
+                    if (user) {
+                        S.uFlag = true;
+                        S.userLabel = user.username;
+                        S.$notify({ title: '提示', type: data.state, message: S.getReqMessage(data) });
+                        S.umeditor.setEnabled();
+                        S.handleResetClick();
+                    } else {
+                        S.$notify({ title: '提示', type: data.state, message: S.getReqMessage(data) });
+                        S.userLabel = undefined;
+                    }
+                    S.loginData.password = undefined
+                }, { port: PORT });
+                this.dialogVisible = false;
+            },
+            /**
+             * 根据cid来获取issue列表数据
+             */
+            handelMenuChange(classify) {
+                if (classify) {
+                    jsonGetLocalData("/issue/listByCid.do", { classify: classify }, data => {
+                        data = getResultData(data);
+                        this.dataMenusIssues = data;
+                    }, { port: PORT })
+                }
+            },
+            handleMenuIssueClick(e, id) {
+                $(".issue-actived").removeClass("issue-actived");
+
+                e.target.classList.add("issue-actived");
+
+                jsonGetLocalData("/issue/get.do", { id: id }, data => {
+                    data = getOneResultData(data);
+                    this.formEditor.id = data.id;
+                    this.formEditor.title = data.title;
+                    this.formEditor.classify = data.classify;
+                    this.umeditor.setContent(data.content);
+                }, { port: PORT })
+            },
+            handleCollapseHide() {
+                this.isHide = !this.isHide;
+            },
+            umEditorResize() {
+                this.$nextTick(function () {
+                    let width = document.body.clientWidth;
+                    let height = document.body.clientHeight;
+                    let lw = $('.nav-box').height();
+                    height -= lw + 110;
+                    this.umeditor.setHeight(height);
+                })
+            },
+            validate(result, msg) {
+                if (result) {
+                    this.$notify({ title: '提示', message: msg, type: 'error' });
+                }
+                return !result;
+            },
+            handleNewClick() {
+                this.formEditor.id = undefined;
+                this.formEditor.title = "TODO";
+                this.umeditor.setContent('<p></p>');
+            },
+            handleSaveClick() {
+                this.formEditor.content = this.umeditor.getContent();
+                // 校验
+                let flag = true;
+                flag &= this.validate(!this.formEditor.content && this.formEditor.content === '', '内容不能为空');
+                flag &= this.validate(!this.formEditor.title && this.formEditor.title === '', '标题不能为空');
+                flag &= this.validate(!this.formEditor.classify && this.formEditor.classify === '', '类别不能为空');
+
+                // 执行操作
+                if (flag) {
+                    if (this.formEditor.id) {
+                        // 更新
+                        jsonPostLocalData("/issue/update.do", this.formEditor, data => {
+                            this.$message({
+                                type: data.state,
+                                message: this.getReqMessage(data)
+                            });
+                            // 你更新这个issue到那个菜单，自动的切换到指定的菜单，展开指定菜单项
+                            this.loadIssuesList(this.formEditor.classify);
+                        }, { port: PORT });
+                    } else {
+                        // 添加
+                        jsonPostLocalData("/issue/add.do", this.formEditor, data => {
+                            this.$message({
+                                type: data.state,
+                                message: this.getReqMessage(data)
+                            });
+
+                            // 如果执行成功则下一步
+                            if (data.state === 'success') {
+                                // 你更新这个issue到那个菜单，自动的切换到指定的菜单，展开指定菜单项
+                                this.loadIssuesList(this.formEditor.classify);
+                                this.resetIssueRelate();
+                            }
+
+                        }, { port: PORT });
+                    }
+                }
+            },
+            /**
+             * 管理分类的改变
+             * @param id
+             */
+            handleClassifyChange(id) {
+                for (let item of this.dataMenus) {
+                    if (item.id === id) {
+                        this.formClassify.name = item.name;
+                    }
+                }
+            },
+            handleClassifySaveClick() {
+                let flag = true;
+                flag = this.validate(!this.formClassify && this.formClassify.name === '', '类别名称不能为空');
+                // 执行操作
+                if (flag) {
+                    if (this.formClassify.id) {
+                        jsonPostLocalData("/classify/update.do", this.formClassify, data => {
+                            this.$message({
+                                type: data.state,
+                                message: this.getReqMessage(data)
+                            });
+                            // 重新加载菜单
+                            this.loadMenuDatas();
+                        }, { port: PORT });
+                    } else {
+                        jsonPostLocalData("/classify/add.do", this.formClassify, data => {
+                            this.$message({
+                                type: data.state,
+                                message: this.getReqMessage(data)
+                            });
+                            this.formClassify.name = undefined;
+                            // 重新加载菜单
+                            this.loadMenuDatas();
+                        }, { port: PORT });
+                    }
+                }
+            },
+            /**
+             * 重新根据cid加载菜单项
+             */
+            loadIssuesList(cid) {
+                // 重新加载菜单,计算统计值
+                this.loadMenuDatas();
+                if (!cid) {
+                    this.dataMenusIssues = [];
+                    this.cid = undefined;
+                }
+
+
+                // 重新加载cid下面的issue列表
+                this.handelMenuChange(cid);
+                // 重新获取数据之后展开对应的菜单项
+                this.cid = cid;
+            },
+            // 清理编辑和添加的数据
+            resetIssueRelate() {
+                // 清理必要的窗口上填写的信息
+                this.handleNewClick();
+                this.formEditor.content = undefined;
+                this.formEditor.classify = undefined;
+
+                // 重置分类管理的菜单项
+                this.handleResetClassify();
+                // 隐藏分类管理的操作部分
+                this.showClassifyManage = false;
+            },
+            /**
+             * 完全重置操作
+             */
+            handleResetClick() {
+                // 重置和issue相关的页面的编辑信息
+                this.resetIssueRelate();
+
+                // 重新加载菜单数据
+                this.loadIssuesList();
+
+                // 当分类折叠的时候需要调整一下
+                this.umEditorResize();
+            },
+            handleResetClassify() {
+                this.formClassify.id = undefined;
+                this.formClassify.name = undefined;
+            },
+            handleClassifyClick() {
+                let S = this;
+                S.showClassifyManage = !S.showClassifyManage;
+                S.umEditorResize()
+            },
+            handleDeleteIssue() {
+                this.$confirm('此操作将永久删除该文件, 是否继续?', '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                }).then(() => {
+                    jsonPostLocalData("/issue/delete.do", { id: this.formEditor.id }, data => {
+                        this.$message({
+                            type: data.state,
+                            message: this.getReqMessage(data)
+                        });
+
+                        // 重置issue编辑信息
+                        this.resetIssueRelate();
+                        // 重新加载此菜单数据展示
+                        this.loadIssuesList(this.cid);
+                    }, { port: PORT });
+                }).catch(() => {
+                });
+            },
+            handleDeleteClassify() {
+                this.$confirm('此操作将永久删除该文件, 是否继续?', '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                }).then(() => {
+                    jsonPostLocalData("/classify/delete.do", { id: this.formClassify.id }, data => {
+                        this.$message({
+                            type: data.state,
+                            message: this.getReqMessage(data)
+                        });
+
+                        //执行完全的重置操作
+                        this.handleResetClick();
+                    }, { port: PORT });
+                }).catch(() => {
+                });
+            }
+        },
+        created() {
+        },
+        mounted() {
+            let S = this;
+            window.addEventListener('resize', () => {
+                setTimeout(S.umEditorResize(), 300);
+            }, false);
+
+            // 编辑器必须在你绑定之前初始化，他会将script标签代替掉，生成div
+            S.umeditor = UE.getEditor('myEditor');
+            UE.g_upload_img_server = `http://localhost:${PORT}`;
+
+            //对编辑器的操作最好在编辑器ready之后再做
+            S.umeditor.ready(function(){
+                // 控制编辑
+                if (!S.uFlag) {
+                    S.umeditor.setDisabled('fullscreen');
+                }
+
+                //设置宽度自适应
+                S.umEditorResize();
+
+                // 隐藏这个遮盖层
+                S.hideShade = true;
+                // $('div.mod-layer').css('display', 'none');
+
+                // 只有初始化完成之后再去校验是否登录才是有效的
+                jsonGetLocalData("/user/getLogin.do", {}, data => {
+                    if (data.state === 'success') {
+                        data = getOneResultData(data);
+                        S.uFlag = true;
+                        S.userLabel = data.username;
+                        S.umeditor.setEnabled();
+                        S.loadMenuDatas();
+                    } else {
+                        S.dialogVisible = true;
+                    }
+                }, { port: PORT });
+            });
+        }
+    })
+</script>
+
+</html>
